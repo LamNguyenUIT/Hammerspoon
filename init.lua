@@ -359,4 +359,4 @@ end
 hs.hotkey.bind(hyper, "N", function()
     createNewTextFile()
 end)
----- Hotkey: Hyper + N
+---- 
