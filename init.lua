@@ -359,4 +359,57 @@ end
 hs.hotkey.bind(hyper, "N", function()
     createNewTextFile()
 end)
----- 
+
+-------------------------------------------------
+-- Hyper + A : Mở nhanh 4 thư mục xếp về 4 góc màn hình
+-------------------------------------------------
+
+local function openAndLayoutVideoFolders()
+    local screen = hs.screen.mainScreen() or hs.screen.primaryScreen()
+    local folders = {
+        {path = "/Volumes/DATA/VIDEO JOBS", unit = {x = 0.0, y = 0.0, w = 0.5, h = 0.5}},
+        {path = "/Volumes/AcasisData/VIDEO JOBS/SHORT AFF VIDEOS", unit = {x = 0.5, y = 0.0, w = 0.5, h = 0.5}},
+        {path = "/Volumes/DATA/VIDEO JOBS/ShortVideos", unit = {x = 0.0, y = 0.5, w = 0.5, h = 0.5}},
+        {path = "/Volumes/AcasisData/VIDEO JOBS/Short Output Videos", unit = {x = 0.5, y = 0.5, w = 0.5, h = 0.5}}
+    }
+
+    local missing = {}
+    local hasAny = false
+
+    for _, f in ipairs(folders) do
+        local attr = hs.fs.attributes(f.path)
+        if attr and attr.mode == "directory" then
+            hs.task.new("/usr/bin/open", nil, {f.path}):start()
+            hasAny = true
+        else
+            table.insert(missing, string.match(f.path, "[^/]+$"))
+        end
+    end
+
+    if #missing > 0 then
+        hs.alert.show("Không tìm thấy thư mục: " .. table.concat(missing, ", "), 3)
+    end
+
+    if not hasAny then return end
+
+    -- Chờ Finder mở cửa sổ rồi sắp xếp
+    hs.timer.doAfter(0.8, function()
+        local finder = hs.application.get("Finder")
+        if not finder then return end
+        local wins = finder:allWindows()
+
+        for _, f in ipairs(folders) do
+            local folderName = string.match(f.path, "[^/]+$")
+            for _, win in ipairs(wins) do
+                if win:isStandard() and win:isVisible() and win:title() == folderName then
+                    moveUnit(win, f.unit, screen)
+                end
+            end
+        end
+    end)
+end
+
+-- Hotkey: Hyper + A
+hs.hotkey.bind(hyper, "A", function()
+    openAndLayoutVideoFolders()
+end)
