@@ -413,3 +413,74 @@ end
 hs.hotkey.bind(hyper, "A", function()
     openAndLayoutVideoFolders()
 end)
+
+-------------------------------------------------
+-- Xử lý Paste nhanh ảnh từ clipboard thành file trong finder.
+-------------------------------------------------
+
+-- Khởi tạo biến cho hotkey để có thể bật/tắt linh hoạt
+local finderPasteHotKey = nil
+
+finderPasteHotKey = hs.hotkey.new({"cmd"}, "v", function()
+    -- Đọc dữ liệu ảnh từ Clipboard
+    local img = hs.pasteboard.readImage()
+    
+    if img then
+        -- Nếu clipboard chứa ảnh, lấy đường dẫn thư mục Finder đang mở
+        local ok, path = hs.osascript.applescript([[
+            tell application "Finder"
+                try
+                    return POSIX path of (target of front Finder window as alias)
+                on error
+                    return POSIX path of (path to desktop folder as alias)
+                end try
+            end tell
+        ]])
+        
+        if ok and path then
+            -- Đảm bảo đường dẫn kết thúc bằng dấu "/"
+            if string.sub(path, -1) ~= "/" then path = path .. "/" end
+            
+            -- Tạo tên file và đường dẫn tuyệt đối
+            local timestamp = os.date("%Y_%m_%d_%H_%M_%S")
+            local filename = timestamp .. ".png"
+            local filepath = path .. filename
+            
+            -- Lưu file ảnh
+            img:saveToFile(filepath)
+            
+            -- Hiển thị thông báo góc màn hình
+            hs.notify.new({
+                title = "Paste Ảnh Thành Công", 
+                informativeText = "Đã lưu: " .. filename
+            }):send()
+            return -- Dừng thực thi tại đây
+        end
+    end
+    
+    -- TRƯỜNG HỢP KHÔNG PHẢI ẢNH (Text, File, Folder...)
+    -- Tạm thời vô hiệu hoá hotkey này để tránh lặp vô tận (infinite loop)
+    finderPasteHotKey:disable() 
+    
+    -- Mô phỏng phím bấm Cmd+V để Finder thực hiện lệnh dán mặc định
+    hs.eventtap.keyStroke({"cmd"}, "v") 
+    
+    -- Bật lại hotkey sau 50 mili-giây
+    hs.timer.doAfter(0.05, function() 
+        finderPasteHotKey:enable() 
+    end)
+end)
+
+-- Tạo một Watcher để chỉ bắt phím Cmd+V khi đang ở trong Finder
+local finderWatcher = hs.application.watcher.new(function(appName, eventType, appObject)
+    if appName == "Finder" then
+        if eventType == hs.application.watcher.activated then
+            finderPasteHotKey:enable() -- Bật khi vào Finder
+        elseif eventType == hs.application.watcher.deactivated then
+            finderPasteHotKey:disable() -- Tắt khi sang app khác
+        end
+    end
+end)
+
+-- Khởi động Watcher
+finderWatcher:start()
